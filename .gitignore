@@ -1,0 +1,32 @@
+# Environment files
+.env
+
+# Airflow logs
+workflow/logs/*
+!workflow/logs/.gitkeep
+
+# Database persistent data
+data/postgres/*
+!data/postgres/.gitkeep
+
+data/mongo/*
+!data/mongo/.gitkeep
+
+data/clickhouse/*
+!data/clickhouse/.gitkeep
+
+data/kafka/*
+!data/kafka/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
