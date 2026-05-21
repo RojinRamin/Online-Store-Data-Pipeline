@@ -307,7 +307,7 @@ services:
     ports:
       - 5433:5432
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres/data:/var/lib/postgresql/data
     command: |
       postgres
         -c wal_level=logical
