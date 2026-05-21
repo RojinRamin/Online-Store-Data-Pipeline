@@ -307,7 +307,7 @@ services:
     ports:
       - 5433:5432
     volumes:
-      - business-postgres-data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     command: |
       postgres
         -c wal_level=logical
@@ -329,7 +329,8 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=digikala
       - MONGO_INITDB_ROOT_PASSWORD=digikala123
     volumes:
-      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+      - ./data/mongodb:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -358,7 +359,7 @@ services:
     ports:
       - "19092:19092"
     volumes:
-      - ./data:/var/lib/kafka/data
+      - ./data/kafka:/var/lib/kafka/data
 
   kafka-connect:
     image: docker.arvancloud.ir/confluentinc/cp-kafka-connect:8.2.0
@@ -399,7 +400,7 @@ services:
       - "8123:8123"
       - "9000:9000"
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
+      - ./data/clickhouse:/var/lib/clickhouse
       - ./config/users.xml:/etc/clickhouse-server/users.d/users.xml
     environment:
       CLICKHOUSE_DB: digikala_analytics
@@ -413,8 +414,4 @@ services:
 ##########
 
 volumes:
-  postgres-db-volume:
-  business-postgres-data:
-  mongo_data:
   data:
-  clickhouse_data:
