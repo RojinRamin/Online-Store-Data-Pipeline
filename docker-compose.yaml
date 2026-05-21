@@ -415,3 +415,4 @@ services:
 
 volumes:
   data:
+  postgres-db-volume:
