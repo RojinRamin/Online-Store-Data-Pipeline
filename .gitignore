@@ -9,6 +9,8 @@ workflow/logs/*
 data/postgres/*
 !data/postgres/.gitkeep
 
+data/mongodb/*
+
 data/mongo/*
 !data/mongo/.gitkeep
 

@@ -20,12 +20,16 @@ x-airflow-common:
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
     _PIP_ADDITIONAL_REQUIREMENTS: '-i https://package-mirror.liara.ir/repository/pypi/simple --trusted-host package-mirror.liara.ir apache-airflow-providers-mongo[common.compat]'
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    PYTHONPATH: '/opt/airflow'
   volumes:
     - ./workflow/dags:/opt/airflow/dags
     - ./workflow/logs:/opt/airflow/logs
     - ./workflow/config:/opt/airflow/config
     - ./workflow/plugins:/opt/airflow/plugins
+    - ./workflow/tasks:/opt/airflow/tasks
+    - ./workflow/utils:/opt/airflow/utils
     - ../bootcamp-data:/opt/airflow/data
+
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
