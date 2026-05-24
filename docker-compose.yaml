@@ -25,6 +25,7 @@ x-airflow-common:
     - ./workflow/logs:/opt/airflow/logs
     - ./workflow/config:/opt/airflow/config
     - ./workflow/plugins:/opt/airflow/plugins
+    - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -360,7 +361,16 @@ services:
       - "19092:19092"
     volumes:
       - ./data/kafka:/var/lib/kafka/data
-
+ #-----------     
+  schema-registry:
+    image: docker.arvancloud.ir/confluentinc/cp-schema-registry:8.2.0
+    container_name: schema-registry
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8081:8081"
+#--------------
   kafka-connect:
     image: docker.arvancloud.ir/confluentinc/cp-kafka-connect:8.2.0
     container_name: kafka-connect
@@ -377,7 +387,7 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: _connect-status
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
@@ -412,7 +422,36 @@ services:
         hard: 262144
     restart: always
 ##########
+  metabase:
+    image: docker.arvancloud.ir/metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: metabase123
+      MB_DB_HOST: metabase-postgres
+    depends_on:
+      - metabase-postgres
+    restart: always
+
+  metabase-postgres:
+    image: docker.arvancloud.ir/postgres:16
+    container_name: metabase-postgres
+    environment:
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: metabase123
+      POSTGRES_DB: metabase
+    volumes:
+      - metabase-db-volume:/var/lib/postgresql/data
+    restart: always
+############
 
 volumes:
   data:
   postgres-db-volume:
+  metabase-db-volume:
+
