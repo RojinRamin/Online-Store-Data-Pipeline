@@ -1,16 +1,25 @@
 from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.providers.standard.sensors.filesystem import FileSensor  
-from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.mongo.hooks.mongo import MongoHook
 import os
 import json
 import glob
 import pandas as pd
-from hashlib import md5
+import sys
+
+sys.path.insert(0, '/opt/airflow/mongo')
+
+from cast_utils import (
+    TransformError,
+    is_null,
+    cast_str,
+    cast_int,
+    cast_float,
+    cast_bool,
+    cast_datetime 
+)
 
 # ============================================
-FOLDER_PATH = "/opt/airflow/data/"  
+FOLDER_PATH = "/opt/airflow/behavioral-data/"  
 FILE_PATTERN = "*.json"  
 # ============================================
 
@@ -46,30 +55,52 @@ def find_new_files(**kwargs):
 def process_single_file(file_name, **kwargs):
 
     hook = MongoHook(mongo_conn_id='mongo_test')
+
     client = hook.get_conn()
-    db = client['mongodb']  
+
+    db = client['mongodb']
+
+    state_collection = db['state']
 
     file_path = os.path.join(FOLDER_PATH, file_name)
-    
+
+    # Transform records
     if FILE_PATTERN == "*.json":
-        transformed_events = transform_jsonl_file(file_path)
-    
 
-    records = transformed_events = transform_jsonl_file(file_path)
+        records = transform_jsonl_file(file_path)
 
-    
+    else:
+
+        records = []
+
     if not records:
-        return 0
-    
-    status_collection = db['state']
 
-    status_collection.insert_one({
+        print(f"[INFO] No valid records found in {file_name}")
+
+        return 0
+
+    # Load records into MongoDB
+    inserted_count = load_records_to_mongodb(records, db)
+
+    # Update processing state
+    state_collection.insert_one({
+
         'file_name': file_name,
+
         'processed_at': datetime.utcnow(),
-        'status': 'success'
+
+        'status': 'success',
+
+        'records_inserted': inserted_count
     })
 
-    return len(records)
+    print(
+        f"[INFO] File processed successfully | "
+        f"file={file_name} | "
+        f"inserted_records={inserted_count}"
+    )
+
+    return inserted_count
 
 
 
@@ -125,85 +156,8 @@ VALID_EVENT_TYPES = {
     "checkout_start",
     "payment_attempt",
     "order_complete",
+    "review_submit"
 }
-
-
-class TransformError(Exception):
-    """Raised when a raw event cannot be transformed safely."""
-    pass
-
-
-def is_null(value):
-    return (
-        value is None
-        or value == ""
-        or str(value).strip().lower() in ["null", "none", "nan"]
-    )
-
-
-def cast_str(value, field_name, required=False, default=None):
-    if is_null(value):
-        if required:
-            raise TransformError(f"Required string field is null: {field_name}")
-        return default
-
-    return str(value).strip()
-
-
-def cast_int(value, field_name, required=False, default=None):
-    if is_null(value):
-        if required:
-            raise TransformError(f"Required int field is null: {field_name}")
-        return default
-
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        raise TransformError(f"Cannot cast field '{field_name}' to int: {value}")
-
-
-def cast_float(value, field_name, required=False, default=None):
-    if is_null(value):
-        if required:
-            raise TransformError(f"Required float field is null: {field_name}")
-        return default
-
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        raise TransformError(f"Cannot cast field '{field_name}' to float: {value}")
-
-
-def cast_bool(value, field_name, required=False, default=None):
-    if is_null(value):
-        if required:
-            raise TransformError(f"Required bool field is null: {field_name}")
-        return default
-
-    if isinstance(value, bool):
-        return value
-
-    normalized = str(value).strip().lower()
-
-    if normalized in ["true", "1", "yes", "y"]:
-        return True
-
-    if normalized in ["false", "0", "no", "n"]:
-        return False
-
-    raise TransformError(f"Cannot cast field '{field_name}' to bool: {value}")
-
-
-def cast_datetime(value, field_name="timestamp", required=True, default=None):
-    if is_null(value):
-        if required:
-            raise TransformError(f"Required datetime field is null: {field_name}")
-        return default
-
-    try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        raise TransformError(f"Cannot cast field '{field_name}' to datetime: {value}")
 
 
 def validate_common_fields(raw_event):
@@ -260,7 +214,7 @@ def transform_cart_view(raw_event):
 def transform_add_to_cart(raw_event):
     return {
         "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
-        "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True),
+        "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True, default=1),
         "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False, default=None),
     }
 
@@ -268,7 +222,7 @@ def transform_add_to_cart(raw_event):
 def transform_remove_from_cart(raw_event):
     return {
         "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
-        "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True),
+        "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True, default=1),
         "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False, default=None),
     }
 
@@ -296,9 +250,17 @@ def transform_payment_attempt(raw_event):
 
 
 def transform_order_complete(raw_event):
+    
     return {
         "order_id": cast_str(raw_event.get("order_id"), "order_id", required=True),
         "fulfillment_speed": cast_str(raw_event.get("fulfillment_speed"), "fulfillment_speed", required=False, default=None),
+    }
+
+def transform_review_submit(raw_event):
+    return {
+        "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
+        "rating": cast_int(raw_event.get("rating"), "rating", required=True), 
+        "text_length": cast_int(raw_event.get("text_length"), "text_length", required=False, default=0)  
     }
 
 
@@ -312,6 +274,7 @@ EVENT_TRANSFORMERS = {
     "checkout_start": transform_checkout_start,
     "payment_attempt": transform_payment_attempt,
     "order_complete": transform_order_complete,
+    "review_submit": transform_review_submit
 }
 
 
@@ -334,7 +297,6 @@ def transform_event(raw_event, source_file):
             "loaded_at": datetime.utcnow(),
         },
     }
-
 
 def transform_jsonl_file(file_path):
     """
@@ -374,55 +336,42 @@ def transform_jsonl_file(file_path):
 
     return transformed_events
 
+
+def load_records_to_mongodb(records, db):
+
+    inserted_count = 0
+
+    for record in records:
+
+        try:
+
+            event_type = record["event_type"]
+
+            # Dynamic collection selection
+            collection = db[event_type]
+
+            # Create unique index
+            collection.create_index(
+                [
+                    ("timestamp", 1),
+                    ("session_id", 1)
+                ],
+                unique=True
+            )
+
+            collection.insert_one(record)
+
+            inserted_count += 1
+
+        except Exception as e:
+
+            print(
+                f"[WARNING] Failed to insert record | "
+                f"event_type={record.get('event_type')} | "
+                f"error={str(e)}"
+            )
+
+    return inserted_count
+
 # ============================================
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'start_date': datetime(2025, 1, 1),
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
-}
 
-with DAG(
-    dag_id='process_new_files_to_mongodb',
-    default_args=default_args,
-    schedule='@hourly',  
-    catchup=False,
-
-) as dag:
-
-
-    wait_file = FileSensor(
-
-        task_id = "wait_file" ,
-
-        filepath = "/opt/airflow/data/*.json",
-
-        poke_interval=10,
-
-        timeout=300 ,
-
-        fs_conn_id = "fs_default" 
-    )
-    
-    task1 = PythonOperator(
-        task_id='get_file_list',
-        python_callable=get_file_list_from_server,
-    )
-    
-    task2 = PythonOperator(
-        task_id='get_state',
-        python_callable=get_state_from_mongo,
-    )
-    
-    task3 = PythonOperator(
-        task_id='find_new_files',
-        python_callable=find_new_files,
-    )
-    
-    task4 = PythonOperator(
-        task_id='process_all_new_files',
-        python_callable=process_all_new_files,
-    )
-    
-    wait_file >> task1 >> task2 >> task3 >> task4
