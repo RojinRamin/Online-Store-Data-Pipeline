@@ -18,6 +18,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
     _PIP_ADDITIONAL_REQUIREMENTS: "-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat]"
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
+    PYTHONPATH: "/opt/airflow"
   volumes:
     - ./workflow/dags:/opt/airflow/dags
     - ./workflow/logs:/opt/airflow/logs
