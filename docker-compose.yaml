@@ -1,26 +1,24 @@
-x-airflow-common:
-  &airflow-common
+x-airflow-common: &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:-docker.arvancloud.ir/apache/airflow:3.2.1}
   env_file:
     - ${ENV_FILE_PATH:-.env}
-  environment:
-    &airflow-common-env
+  environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ${FERNET_KEY}
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
-    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
-    _PIP_ADDITIONAL_REQUIREMENTS: '-i https://package-mirror.liara.ir/repository/pypi/simple --trusted-host package-mirror.liara.ir apache-airflow-providers-mongo[common.compat]'
-    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    PYTHONPATH: '/opt/airflow'
+    # _PIP_ADDITIONAL_REQUIREMENTS: "apache-airflow-providers-mongo[common.compat]"
+    AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
+    PYTHONPATH: "/opt/airflow"
   volumes:
     - ./workflow/dags:/opt/airflow/dags
     - ./workflow/logs:/opt/airflow/logs
@@ -28,11 +26,10 @@ x-airflow-common:
     - ./workflow/plugins:/opt/airflow/plugins
     - ./workflow/tasks:/opt/airflow/tasks
     - ./workflow/utils:/opt/airflow/utils
-    - ../bootcamp-data:/opt/airflow/data
-
+    - /home/deuser/bootcamp-data:/opt/airflow/data
+    - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
   user: "${AIRFLOW_UID:-50000}:0"
-  depends_on:
-    &airflow-common-depends-on
+  depends_on: &airflow-common-depends-on
     redis:
       condition: service_healthy
     airflow-postgres:
@@ -41,7 +38,6 @@ x-airflow-common:
 # ---------
 
 services:
-
   airflow-postgres:
     container_name: airflow-postgres
     image: docker.arvancloud.ir/postgres:16
@@ -57,11 +53,9 @@ services:
       retries: 5
       start_period: 5s
     restart: always
-# --------
+  # --------
   redis:
     container_name: redis
-    # Redis is limited to 7.2-bookworm due to licencing change
-    # https://redis.io/blog/redis-adopts-dual-source-available-licensing/
     image: docker.arvancloud.ir/redis:7.2-bookworm
     expose:
       - 6379
@@ -72,7 +66,7 @@ services:
       retries: 50
       start_period: 30s
     restart: always
-# -------
+  # -------
   airflow-apiserver:
     container_name: airflow-apiserver
     <<: *airflow-common
@@ -80,7 +74,8 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      test:
+        ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -95,10 +90,10 @@ services:
       mongodb:
         condition: service_healthy
       kafka:
-        condition: service_started     
+        condition: service_started
       clickhouse:
         condition: service_started
-# -------
+  # -------
   airflow-scheduler:
     container_name: airflow-scheduler
     <<: *airflow-common
@@ -114,13 +109,17 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-# -------
+  # -------
   airflow-dag-processor:
     container_name: airflow-dag-processor
     <<: *airflow-common
     command: dag-processor
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -130,14 +129,18 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-# -------
+  # -------
   airflow-worker:
     container_name: airflow-worker
     <<: *airflow-common
     command: celery worker
     healthcheck:
       # yamllint disable rule:line-length
-      test: ["CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"']
+      test:
+        [
+          "CMD-SHELL",
+          'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -154,13 +157,17 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
-# -------
+  # -------
   airflow-triggerer:
     container_name: airflow-triggerer
     <<: *airflow-common
     command: triggerer
     healthcheck:
-      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -170,7 +177,7 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-# -------
+  # -------
   airflow-init:
     container_name: airflow-init
     <<: *airflow-common
@@ -256,11 +263,11 @@ services:
 
     environment:
       <<: *airflow-common-env
-      _AIRFLOW_DB_MIGRATE: 'true'
-      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-      _PIP_ADDITIONAL_REQUIREMENTS: ''
+      _PIP_ADDITIONAL_REQUIREMENTS: ""
     user: "0:0"
 
   airflow-cli:
@@ -278,7 +285,7 @@ services:
     depends_on:
       <<: *airflow-common-depends-on
 
-# -------
+  # -------
 
   flower:
     container_name: flower
@@ -300,7 +307,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-############
+  ############
   postgres-business:
     container_name: postgres-business
     image: docker.arvancloud.ir/postgres:16
@@ -313,6 +320,8 @@ services:
       - 5433:5432
     volumes:
       - ./data/postgres/data:/var/lib/postgresql/data
+      - ./data/postgres:/docker-entrypoint-initdb.d
+
     command: |
       postgres
         -c wal_level=logical
@@ -325,7 +334,7 @@ services:
       - 8182:8080
     depends_on:
       - postgres-business
-############
+  ############
 
   mongodb:
     image: docker.arvancloud.ir/mongo:7.0
@@ -342,7 +351,7 @@ services:
       timeout: 5s
       retries: 5
 
-#############
+  #############
 
   kafka:
     image: docker.arvancloud.ir/apache/kafka:4.2.0
@@ -365,7 +374,16 @@ services:
       - "19092:19092"
     volumes:
       - ./data/kafka:/var/lib/kafka/data
-
+  #-----------
+  schema-registry:
+    image: docker.arvancloud.ir/confluentinc/cp-schema-registry:8.2.0
+    container_name: schema-registry
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8081:8081"
+  #--------------
   kafka-connect:
     image: docker.arvancloud.ir/confluentinc/cp-kafka-connect:8.2.0
     container_name: kafka-connect
@@ -382,7 +400,7 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: _connect-status
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
@@ -396,7 +414,7 @@ services:
     volumes:
       - ./kafka-connect-plugins:/usr/share/confluent-hub-components
 
-##############
+  ##############
 
   clickhouse:
     image: docker.arvancloud.ir/clickhouse/clickhouse-server:latest
@@ -416,8 +434,36 @@ services:
         soft: 262144
         hard: 262144
     restart: always
-##########
+  ##########
+  metabase:
+    image: docker.arvancloud.ir/metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: metabase123
+      MB_DB_HOST: metabase-postgres
+    depends_on:
+      - metabase-postgres
+    restart: always
+
+  metabase-postgres:
+    image: docker.arvancloud.ir/postgres:16
+    container_name: metabase-postgres
+    environment:
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: metabase123
+      POSTGRES_DB: metabase
+    volumes:
+      - metabase-db-volume:/var/lib/postgresql/data
+    restart: always
+############
 
 volumes:
   data:
   postgres-db-volume:
+  metabase-db-volume:

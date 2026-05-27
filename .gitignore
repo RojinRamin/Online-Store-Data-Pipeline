@@ -6,7 +6,7 @@ workflow/logs/*
 !workflow/logs/.gitkeep
 
 # Database persistent data
-data/postgres/*
+data/postgres/data
 !data/postgres/.gitkeep
 
 data/mongodb/*

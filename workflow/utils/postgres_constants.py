@@ -6,30 +6,29 @@ EXPECTED_COLUMNS = {
         "user_id",
         "name",
         "email",
-        "date_signup",
+        "signup_date",
         "device",
         "loyalty_tier",
         "location"
     ],
-
     "products": [
         "product_id",
         "name",
         "price",
         "category",
         "inventory",
-        "score_popularity"
+        "popularity_score"
     ],
-
     "orders": [
         "order_id",
         "user_id",
-        "timestamp",
+        "created_at",
         "total",
         "status",
         "payment_method"
     ]
 }
+
 
 PRIMARY_KEYS = {
     "users": "user_id",
