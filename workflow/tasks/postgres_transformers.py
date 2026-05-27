@@ -55,7 +55,7 @@ def clean_dataframe(df, table_name):
             df["signup_date"] = pd.to_datetime(df["signup_date"], errors="coerce")
 
         if "device" in df.columns:
-            def["device"] = (
+            df["device"] = (
                 df["device"]
                 .astype(str)
                 .str.strip()
