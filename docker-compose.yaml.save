@@ -18,7 +18,7 @@ x-airflow-common:
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
-    _PIP_ADDITIONAL_REQUIREMENTS: '-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat]'
+    _PIP_ADDITIONAL_REQUIREMENTS: '-i https://package-mirror.liara.ir/repository/pypi/simple --trusted-host package-mirror.liara.ir apache-airflow-providers-mongo[common.compat]'
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
     - ./workflow/dags:/opt/airflow/dags
@@ -26,7 +26,6 @@ x-airflow-common:
     - ./workflow/config:/opt/airflow/config
     - ./workflow/plugins:/opt/airflow/plugins
     - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
-    - /home/deuser/projects/online_store_data_pipeline/data/mongodb:/opt/airflow/mongo   
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -331,7 +330,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=digikala
       - MONGO_INITDB_ROOT_PASSWORD=digikala123
     volumes:
-      - /home/deuser/projects/online_store_data_pipeline/data/mongodb:/docker-entrypoint-initdb.d
+      - ./mongo-init:/docker-entrypoint-initdb.d
       - ./data/mongodb:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
@@ -379,7 +378,8 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: _connect-status
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
