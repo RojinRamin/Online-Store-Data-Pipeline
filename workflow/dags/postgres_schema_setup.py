@@ -24,10 +24,6 @@ with DAG(
         DROP TABLE IF EXISTS orders;
         DROP TABLE IF EXISTS users;
         DROP TABLE IF EXISTS products;
-        DROP TYPE loyalty_tier_enum;
-        DROP TYPE orders_status;
-        DROP TYPE orders_payment_method;
-        DROP TYPE products_category;
 
         CREATE TYPE loyalty_tier_enum AS ENUM (
             'Bronze',
