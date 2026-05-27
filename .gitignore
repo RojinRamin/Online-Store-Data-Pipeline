@@ -17,6 +17,9 @@ data/mongo/*
 data/clickhouse/*
 !data/clickhouse/.gitkeep
 
+data/mongodb/*
+
+
 data/kafka/*
 !data/kafka/.gitkeep
 
