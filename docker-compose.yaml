@@ -28,7 +28,7 @@ x-airflow-common: &airflow-common
     - ./workflow/utils:/opt/airflow/utils
     - /home/deuser/bootcamp-data:/opt/airflow/data
     - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
-    - /home/deuser/projects/online_store_data_pipeline/data/mongodb:/opt/airflow/mongo
+    - /home/deuser/projects/online_store_data_pipeline/scripts/mongo:/opt/airflow/mongo
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     redis:

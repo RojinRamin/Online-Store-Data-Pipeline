@@ -94,11 +94,11 @@ def process_single_file(file_name, **kwargs):
         'records_inserted': inserted_count
     })
 
-    print(
-        f"[INFO] File processed successfully | "
-        f"file={file_name} | "
-        f"inserted_records={inserted_count}"
-    )
+   # print(
+   #     f"[INFO] File processed successfully | "
+   #     f"file={file_name} | "
+   #     f"inserted_records={inserted_count}"
+   # )
 
     return inserted_count
 
@@ -321,9 +321,9 @@ def transform_jsonl_file(file_path):
                 transformed_event = transform_event(raw_event, file_path)
                 transformed_events.append(transformed_event)
 
-                if len(transformed_events) == 1:
-                    print(f"\n[DEBUG] Sample transformed event (line {line_number}):")
-                    print(json.dumps(transformed_event, indent=2, default=str))
+               # if len(transformed_events) == 1:
+               #     print(f"\n[DEBUG] Sample transformed event (line {line_number}):")
+               #     print(json.dumps(transformed_event, indent=2, default=str))
 
             except Exception as error:
 

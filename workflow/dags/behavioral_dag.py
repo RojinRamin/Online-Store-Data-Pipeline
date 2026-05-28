@@ -27,7 +27,7 @@ DEFAULT_ARGS = {
 with DAG(
     dag_id="process_new_files_to_mongodb",
     default_args=DEFAULT_ARGS,
-    schedule="@hourly",
+    schedule="@daily",
     catchup=False,
 ) as dag:
 
