@@ -1,25 +1,23 @@
 from airflow import DAG
+from datetime import datetime
+import os
+from utils.postgres_constants import BASE_PATH
+from utils.last_modified_sensor import FileModifiedSensor
+from tasks.postgres_load import load_to_postgres
+from datetime import timedelta
 from airflow.providers.standard.operators.python import (
     PythonOperator
 )
-
 from airflow.providers.standard.operators.empty import (
     EmptyOperator
 )
 
-from datetime import datetime
-import os
 
-from utils.postgres_constants import BASE_PATH
-
-from utils.last_modified_sensor import FileModifiedSensor
-
-from tasks.postgres_load import load_to_postgres
 
 with DAG(
     dag_id="csv_etl_pipeline",
     start_date=datetime(2026, 1, 1),
-    schedule="*/1 * * * *",
+    schedule="@hourly",
     catchup=False,
     tags=["etl", "csv", "postgres"],
     max_active_runs=1
@@ -39,7 +37,7 @@ with DAG(
 
         variable_key="users_mtime",
         mode="reschedule",
-        timeout=60 * 30,
+        timeout=timedelta(days=1),
         poke_interval=30
     )
 
@@ -54,7 +52,7 @@ with DAG(
 
         variable_key="orders_mtime",
         mode="reschedule",
-        timeout=60 * 30,
+        timeout=timedelta(days=1),
         poke_interval=30
     )
 

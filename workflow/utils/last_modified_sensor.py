@@ -44,4 +44,9 @@ class FileModifiedSensor(BaseSensorOperator):
 
             return True
 
+        elif current_mtime == last_mtime:
+            print('Nothing Changed')
+            return True
+
+
         return False
