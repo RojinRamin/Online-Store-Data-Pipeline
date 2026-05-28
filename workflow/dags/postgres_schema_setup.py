@@ -24,7 +24,11 @@ with DAG(
         DROP TABLE IF EXISTS orders;
         DROP TABLE IF EXISTS users;
         DROP TABLE IF EXISTS products;
-
+        DROP TYPE IF EXISTS loyalty_tier_enum CASCADE;
+        DROP TYPE IF EXISTS orders_status CASCADE;
+        DROP TYPE IF EXISTS orders_payment_method CASCADE;
+        DROP TYPE IF EXISTS products_category CASCADE;
+        
         CREATE TYPE loyalty_tier_enum AS ENUM (
             'Bronze',
             'Silver',
@@ -41,6 +45,7 @@ with DAG(
             'google_pay',
             'paypal'
         );
+
         CREATE TYPE products_category AS ENUM (
             'Beauty',
             'Clothing',
@@ -48,6 +53,7 @@ with DAG(
             'Home',
             'Other'
         );
+
         CREATE TABLE IF NOT EXISTS users (
             user_id VARCHAR(50) PRIMARY KEY,
             name TEXT NOT NULL,

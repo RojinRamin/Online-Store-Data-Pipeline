@@ -1,6 +1,12 @@
 from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.python import (
+    PythonOperator
+)
+
+from airflow.providers.standard.operators.empty import (
+    EmptyOperator
+)
+
 from datetime import datetime
 import os
 
@@ -32,7 +38,8 @@ with DAG(
         ),
 
         variable_key="users_mtime",
-
+        mode="reschedule",
+        timeout=60 * 30,
         poke_interval=30
     )
 
@@ -46,7 +53,8 @@ with DAG(
         ),
 
         variable_key="orders_mtime",
-
+        mode="reschedule",
+        timeout=60 * 30,
         poke_interval=30
     )
 
