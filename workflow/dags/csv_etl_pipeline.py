@@ -17,7 +17,7 @@ from airflow.providers.standard.operators.empty import (
 with DAG(
     dag_id="csv_etl_pipeline",
     start_date=datetime(2026, 1, 1),
-    schedule="@hourly",
+    schedule="@daily",
     catchup=False,
     tags=["etl", "csv", "postgres"],
     max_active_runs=1
@@ -38,7 +38,8 @@ with DAG(
         variable_key="users_mtime",
         mode="reschedule",
         timeout=timedelta(days=1),
-        poke_interval=30
+        poke_interval=360,
+        
     )
 
 
@@ -53,7 +54,7 @@ with DAG(
         variable_key="orders_mtime",
         mode="reschedule",
         timeout=timedelta(days=1),
-        poke_interval=30
+        poke_interval=360,
     )
 
     load_users = PythonOperator(
