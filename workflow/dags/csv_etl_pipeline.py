@@ -16,17 +16,17 @@ def file_changed(file_name, variable_key):
     if not os.path.exists(file_path):
         return False
 
-    current_ctime = os.path.getctime(file_path)
+    current_mtim = os.path.getmtim(file_path)
     last_mtime = float(Variable.get(variable_key, default_var=0.0))
 
-    return current_ctime > last_mtime
+    return current_mtim > last_mtime
 
 
 def update_mtime(file_name, variable_key):
     file_path = os.path.join(BASE_PATH, file_name)
 
-    current_ctime = os.path.getctime(file_path)
-    Variable.set(variable_key, str(current_ctime))
+    current_mtim = os.path.getmtim(file_path)
+    Variable.set(variable_key, str(current_mtim))
 
 
 
