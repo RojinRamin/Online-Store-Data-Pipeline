@@ -1,17 +1,66 @@
 from airflow import DAG
 from datetime import datetime
 import os
-from utils.postgres_constants import BASE_PATH
-from utils.last_modified_sensor import FileModifiedSensor
-from tasks.postgres_load import load_to_postgres
-from datetime import timedelta
-from airflow.providers.standard.operators.python import (
-    PythonOperator
-)
-from airflow.providers.standard.operators.empty import (
-    EmptyOperator
-)
 
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.models import Variable
+
+from utils.postgres_constants import BASE_PATH
+from tasks.postgres_load import load_to_postgres
+
+
+def file_changed(file_name, variable_key):
+    file_path = os.path.join(BASE_PATH, file_name)
+
+    if not os.path.exists(file_path):
+        return False
+
+    current_mtime = os.path.getmtime(file_path)
+    last_mtime = float(Variable.get(variable_key, default_var=0.0))
+
+    return current_mtime > last_mtime
+
+
+def update_mtime(file_name, variable_key):
+    file_path = os.path.join(BASE_PATH, file_name)
+
+    current_mtime = os.path.getmtime(file_path)
+    Variable.set(variable_key, str(current_mtime))
+
+
+
+def load_users_if_needed():
+    file_name = "users.csv"
+    key = "users_mtime"
+
+    if file_changed(file_name, key):
+        load_to_postgres("users", file_name)
+        update_mtime(file_name, key)
+    else:
+        print('ُThere is no change for users')
+
+
+def load_orders_if_needed():
+    file_name = "orders.csv"
+    key = "orders_mtime"
+
+    if file_changed(file_name, key):
+        load_to_postgres("orders", file_name)
+        update_mtime(file_name, key)
+    else:
+        print('ُThere is no change for orders')
+
+
+def load_products_if_needed():
+    file_name = "products.csv"
+    key = "products_mtime"
+
+    if file_changed(file_name, key):
+        load_to_postgres("products", file_name)
+        update_mtime(file_name, key)
+    else:
+        print('ُThere is no change for products')
 
 
 with DAG(
@@ -19,69 +68,28 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     schedule="@daily",
     catchup=False,
-    tags=["etl", "csv", "postgres"],
-    max_active_runs=1
+    max_active_runs=1,
+    tags=["etl", "csv", "postgres"]
 ) as dag:
 
     start = EmptyOperator(task_id="start")
-    end = EmptyOperator(task_id="end")
-
-    # File Monitoring Sensors
-    wait_users = FileModifiedSensor(
-        task_id="wait_users",
-
-        file_path=os.path.join(
-            BASE_PATH,
-            "users.csv"
-        ),
-
-        variable_key="users_mtime",
-        mode="reschedule",
-        timeout=timedelta(days=1),
-        poke_interval=360,
-        
-    )
-
-
-    wait_orders = FileModifiedSensor(
-        task_id="wait_orders",
-
-        file_path=os.path.join(
-            BASE_PATH,
-            "orders.csv"
-        ),
-
-        variable_key="orders_mtime",
-        mode="reschedule",
-        timeout=timedelta(days=1),
-        poke_interval=360,
-    )
 
     load_users = PythonOperator(
         task_id="load_users",
-        python_callable=load_to_postgres,
-        op_kwargs={"table_name": "users", "file_name": "users.csv"}
+        python_callable=load_users_if_needed
     )
 
     load_orders = PythonOperator(
         task_id="load_orders",
-        python_callable=load_to_postgres,
-        op_kwargs={"table_name": "orders", "file_name": "orders.csv"}
+        python_callable=load_orders_if_needed
     )
 
     load_products = PythonOperator(
         task_id="load_products",
-        python_callable=load_to_postgres,
-        op_kwargs={"table_name": "products", "file_name": "products.csv"}
+        python_callable=load_products_if_needed
     )
 
-    # Task Pipeline mapping
-    start >> wait_users
-    
-    wait_users >> load_users 
-    
-    # Enforce foreign key requirement: users must load before orders can clear
-    [load_users, wait_orders] >> load_orders
-    
-    
-    [load_orders, load_products] >> end
+    end = EmptyOperator(task_id="end")
+
+
+    start >> load_users >> load_orders >> load_products >> end
