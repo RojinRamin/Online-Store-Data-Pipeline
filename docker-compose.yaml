@@ -59,6 +59,7 @@ services:
       retries: 5
       start_period: 5s
     restart: always
+
   # --------
   redis:
     container_name: redis
@@ -74,6 +75,7 @@ services:
       retries: 50
       start_period: 30s
     restart: always
+
   # -------
   airflow-apiserver:
     container_name: airflow-apiserver
@@ -81,8 +83,12 @@ services:
     command: api-server
     ports:
       - "8080:8080"
+    networks:
+      - airflow-net
+      - traefik
     labels:
       traefik.enable: "true"
+      traefik.docker.network: "traefik_traefik_network"
       traefik.http.routers.airflow.rule: Host(`airflow.group5.querabootcamp-de.ir`)
       traefik.http.routers.airflow.entrypoints: web
       traefik.http.services.airflow.loadbalancer.server.port: "8080"
@@ -106,6 +112,7 @@ services:
         condition: service_started
       clickhouse:
         condition: service_started
+
   # -------
   airflow-scheduler:
     container_name: airflow-scheduler
@@ -122,6 +129,7 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
   # -------
   airflow-dag-processor:
     container_name: airflow-dag-processor
@@ -142,6 +150,7 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
   # -------
   airflow-worker:
     container_name: airflow-worker
@@ -301,6 +310,8 @@ services:
       - flower
     ports:
       - "5555:5555"
+    networks:
+      - airflow-net
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
       interval: 30s
@@ -339,6 +350,8 @@ services:
     image: docker.arvancloud.ir/adminer:standalone
     ports:
       - 8182:8080
+    networks:
+      - airflow-net
     depends_on:
       - postgres-business
   ############
@@ -392,12 +405,15 @@ services:
     container_name: schema-registry
     networks:
       - airflow-net
+    depends_on:
+      kafka:
+        condition: service_started
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     ports:
       - "8081:8081"
-  #--------------
   kafka-connect:
     image: docker.arvancloud.ir/confluentinc/cp-kafka-connect:8.2.0
     container_name: kafka-connect
@@ -435,11 +451,14 @@ services:
     networks:
       - airflow-net
       - traefik
+    ports:
+      - "8085:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     labels:
       traefik.enable: "true"
+      traefik.docker.network: "traefik_traefik_network"
       traefik.http.routers.kafka-ui.rule: Host(`ku.group5.querabootcamp-de.ir`)
       traefik.http.routers.kafka-ui.entrypoints: web
       traefik.http.services.kafka-ui.loadbalancer.server.port: "8080"
@@ -488,6 +507,7 @@ services:
       MB_DB_HOST: metabase-postgres
     labels:
       traefik.enable: "true"
+      traefik.docker.network: "traefik_traefik_network"
       traefik.http.routers.metabase.rule: Host(`mb.group5.querabootcamp-de.ir`)
       traefik.http.routers.metabase.entrypoints: web
       traefik.http.services.metabase.loadbalancer.server.port: "3000"
@@ -507,7 +527,6 @@ services:
     volumes:
       - metabase-db-volume:/var/lib/postgresql/data
     restart: always
-############
 
 networks:
   airflow-net:
