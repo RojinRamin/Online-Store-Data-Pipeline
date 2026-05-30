@@ -36,7 +36,7 @@ with DAG(
         filepath="/opt/airflow/behavioral-data/*.json",
         poke_interval=10,
         timeout=300,
-        fs_conn_id="fs_default",
+        fs_conn_id="mongo_test",
     )
 
     get_file_list = PythonOperator(

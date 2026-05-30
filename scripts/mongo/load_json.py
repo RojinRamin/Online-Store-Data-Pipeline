@@ -130,7 +130,7 @@ with DAG(
 
         timeout=300 ,
 
-        fs_conn_id = "fs_default" 
+        fs_conn_id = "mongo_test" 
     )
     
     task1 = PythonOperator(
