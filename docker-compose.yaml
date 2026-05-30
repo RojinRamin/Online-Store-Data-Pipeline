@@ -339,14 +339,6 @@ services:
     image: docker.arvancloud.ir/adminer:standalone
     ports:
       - 8182:8080
-    networks:
-      - airflow-net
-      - traefik
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.adminer.rule: Host(`db.group5.querabootcamp-de.ir`)
-      traefik.http.routers.adminer.entrypoints: web
-      traefik.http.services.adminer.loadbalancer.server.port: "8080"
     depends_on:
       - postgres-business
   ############
