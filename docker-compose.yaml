@@ -35,6 +35,9 @@ x-airflow-common: &airflow-common
       condition: service_healthy
     airflow-postgres:
       condition: service_healthy
+  networks:
+    - airflow-net
+    - traefik
 
 # ---------
 
@@ -42,6 +45,8 @@ services:
   airflow-postgres:
     container_name: airflow-postgres
     image: docker.arvancloud.ir/postgres:16
+    networks:
+      - airflow-net
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -58,6 +63,8 @@ services:
   redis:
     container_name: redis
     image: docker.arvancloud.ir/redis:7.2-bookworm
+    networks:
+      - airflow-net
     expose:
       - 6379
     healthcheck:
@@ -74,6 +81,11 @@ services:
     command: api-server
     ports:
       - "8080:8080"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.airflow.rule: Host(`airflow.group5.querabootcamp-de.ir`)
+      traefik.http.routers.airflow.entrypoints: web
+      traefik.http.services.airflow.loadbalancer.server.port: "8080"
     healthcheck:
       test:
         ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
@@ -136,7 +148,6 @@ services:
     <<: *airflow-common
     command: celery worker
     healthcheck:
-      # yamllint disable rule:line-length
       test:
         [
           "CMD-SHELL",
@@ -148,8 +159,6 @@ services:
       start_period: 30s
     environment:
       <<: *airflow-common-env
-      # Required to handle warm shutdown of the celery workers properly
-      # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
       DUMB_INIT_SETSID: "0"
     restart: always
     depends_on:
@@ -183,7 +192,6 @@ services:
     container_name: airflow-init
     <<: *airflow-common
     entrypoint: /bin/bash
-    # yamllint disable rule:line-length
     command:
       - -c
       - |
@@ -261,7 +269,6 @@ services:
         echo "Files in shared volumes:"
         echo
         ls -la /opt/airflow/{logs,dags,plugins,config}
-
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: "true"
@@ -285,8 +292,6 @@ services:
       - airflow
     depends_on:
       <<: *airflow-common-depends-on
-
-  # -------
 
   flower:
     container_name: flower
@@ -312,6 +317,8 @@ services:
   postgres-business:
     container_name: postgres-business
     image: docker.arvancloud.ir/postgres:16
+    networks:
+      - airflow-net
     environment:
       TZ: Asia/Tehran
       POSTGRES_USER: digikala
@@ -322,7 +329,6 @@ services:
     volumes:
       - ./data/postgres/data:/var/lib/postgresql/data
       - ./data/postgres:/docker-entrypoint-initdb.d
-
     command: |
       postgres
         -c wal_level=logical
@@ -333,6 +339,14 @@ services:
     image: docker.arvancloud.ir/adminer:standalone
     ports:
       - 8182:8080
+    networks:
+      - airflow-net
+      - traefik
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.adminer.rule: Host(`db.group5.querabootcamp-de.ir`)
+      traefik.http.routers.adminer.entrypoints: web
+      traefik.http.services.adminer.loadbalancer.server.port: "8080"
     depends_on:
       - postgres-business
   ############
@@ -340,6 +354,8 @@ services:
   mongodb:
     image: docker.arvancloud.ir/mongo:7.0
     container_name: mongodb
+    networks:
+      - airflow-net
     environment:
       - MONGO_INITDB_ROOT_USERNAME=digikala
       - MONGO_INITDB_ROOT_PASSWORD=digikala123
@@ -357,6 +373,8 @@ services:
     image: docker.arvancloud.ir/apache/kafka:4.2.0
     container_name: kafka
     hostname: kafka
+    networks:
+      - airflow-net
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
@@ -378,6 +396,8 @@ services:
   schema-registry:
     image: docker.arvancloud.ir/confluentinc/cp-schema-registry:8.2.0
     container_name: schema-registry
+    networks:
+      - airflow-net
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
@@ -387,6 +407,8 @@ services:
   kafka-connect:
     image: docker.arvancloud.ir/confluentinc/cp-kafka-connect:8.2.0
     container_name: kafka-connect
+    networks:
+      - airflow-net
     depends_on:
       kafka:
         condition: service_started
@@ -413,12 +435,32 @@ services:
       - "8083:8083"
     volumes:
       - ./kafka-connect-plugins:/usr/share/confluent-hub-components
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    networks:
+      - airflow-net
+      - traefik
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.kafka-ui.rule: Host(`ku.group5.querabootcamp-de.ir`)
+      traefik.http.routers.kafka-ui.entrypoints: web
+      traefik.http.services.kafka-ui.loadbalancer.server.port: "8080"
+    depends_on:
+      kafka:
+        condition: service_started
+    restart: always
 
   ##############
 
   clickhouse:
     image: docker.arvancloud.ir/clickhouse/clickhouse-server:latest
     container_name: clickhouse
+    networks:
+      - airflow-net
     ports:
       - "8123:8123"
       - "9000:9000"
@@ -438,6 +480,9 @@ services:
   metabase:
     image: docker.arvancloud.ir/metabase/metabase:latest
     container_name: metabase
+    networks:
+      - airflow-net
+      - traefik
     ports:
       - "3000:3000"
     environment:
@@ -447,6 +492,11 @@ services:
       MB_DB_USER: metabase
       MB_DB_PASS: metabase123
       MB_DB_HOST: metabase-postgres
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.metabase.rule: Host(`mb.group5.querabootcamp-de.ir`)
+      traefik.http.routers.metabase.entrypoints: web
+      traefik.http.services.metabase.loadbalancer.server.port: "3000"
     depends_on:
       - metabase-postgres
     restart: always
@@ -454,6 +504,8 @@ services:
   metabase-postgres:
     image: docker.arvancloud.ir/postgres:16
     container_name: metabase-postgres
+    networks:
+      - airflow-net
     environment:
       POSTGRES_USER: metabase
       POSTGRES_PASSWORD: metabase123
@@ -462,6 +514,13 @@ services:
       - metabase-db-volume:/var/lib/postgresql/data
     restart: always
 ############
+
+networks:
+  airflow-net:
+    driver: bridge
+  traefik:
+    external: true
+    name: traefik_traefik_network
 
 volumes:
   data:
