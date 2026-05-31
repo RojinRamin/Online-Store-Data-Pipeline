@@ -57,7 +57,7 @@ with DAG(
         CREATE TABLE IF NOT EXISTS users (
             user_id VARCHAR(50) PRIMARY KEY,
             name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
+            email TEXT,
             signup_date TIMESTAMP,
             device VARCHAR(50),
             loyalty_tier loyalty_tier_enum,
