@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
-    _PIP_ADDITIONAL_REQUIREMENTS: "-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat]"
+    _PIP_ADDITIONAL_REQUIREMENTS: "-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat] apache-airflow-providers-apache-kafka confluent-kafka"
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
     PYTHONPATH: "/opt/airflow"
   volumes:
@@ -26,9 +26,9 @@ x-airflow-common: &airflow-common
     - ./workflow/plugins:/opt/airflow/plugins
     - ./workflow/tasks:/opt/airflow/tasks
     - ./workflow/utils:/opt/airflow/utils
-    - /home/deuser/bootcamp-data:/opt/airflow/data
-    - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
-    - /home/deuser/projects/online_store_data_pipeline/scripts/mongo:/opt/airflow/mongo
+    - ../bootcamp-data:/opt/airflow/data
+    - ../bootcamp-data/behavioral:/opt/airflow/behavioral-data
+    - ./scripts/mongo:/opt/airflow/mongo
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     redis:
@@ -37,7 +37,6 @@ x-airflow-common: &airflow-common
       condition: service_healthy
   networks:
     - airflow-net
-    - traefik
 
 # ---------
 
@@ -85,13 +84,6 @@ services:
       - "8080:8080"
     networks:
       - airflow-net
-      - traefik
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: "traefik_traefik_network"
-      traefik.http.routers.airflow.rule: Host(`airflow.group5.querabootcamp-de.ir`)
-      traefik.http.routers.airflow.entrypoints: web
-      traefik.http.services.airflow.loadbalancer.server.port: "8080"
     healthcheck:
       test:
         ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
@@ -355,7 +347,6 @@ services:
     depends_on:
       - postgres-business
   ############
-
   mongodb:
     image: docker.arvancloud.ir/mongo:7.0
     container_name: mongodb
@@ -372,8 +363,21 @@ services:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
+      retries: 10
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    networks:
+      - airflow-net
+    ports:
+      - "8086:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_ADMINUSERNAME: digikala
+      ME_CONFIG_MONGODB_ADMINPASSWORD: digikala123
+      ME_CONFIG_MONGODB_URL: mongodb://digikala:digikala123@mongodb:27017/
+    depends_on:
+      - mongodb
   #############
 
   kafka:
@@ -450,21 +454,14 @@ services:
     container_name: kafka-ui
     networks:
       - airflow-net
-      - traefik
     ports:
       - "8085:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       AUTH_TYPE: "LOGIN_FORM"
-      SPRING_SECURITY_USER_NAME: "team5" 
+      SPRING_SECURITY_USER_NAME: "team5"
       SPRING_SECURITY_USER_PASSWORD: "team5@quera"
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: "traefik_traefik_network"
-      traefik.http.routers.kafka-ui.rule: Host(`ku.group5.querabootcamp-de.ir`)
-      traefik.http.routers.kafka-ui.entrypoints: web
-      traefik.http.services.kafka-ui.loadbalancer.server.port: "8080"
     depends_on:
       kafka:
         condition: service_started
@@ -498,7 +495,6 @@ services:
     container_name: metabase
     networks:
       - airflow-net
-      - traefik
     ports:
       - "3000:3000"
     environment:
@@ -508,12 +504,6 @@ services:
       MB_DB_USER: metabase
       MB_DB_PASS: metabase123
       MB_DB_HOST: metabase-postgres
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: "traefik_traefik_network"
-      traefik.http.routers.metabase.rule: Host(`mb.group5.querabootcamp-de.ir`)
-      traefik.http.routers.metabase.entrypoints: web
-      traefik.http.services.metabase.loadbalancer.server.port: "3000"
     depends_on:
       - metabase-postgres
     restart: always
@@ -530,13 +520,30 @@ services:
     volumes:
       - metabase-db-volume:/var/lib/postgresql/data
     restart: always
+  schema-loader:
+    image: docker.arvancloud.ir/alpine:latest
+    container_name: schema-loader
 
+    networks:
+      - airflow-net
+
+    depends_on:
+      schema-registry:
+        condition: service_started
+
+    volumes:
+      - ./schema:/schemas
+      - ./scripts/register-schemas.sh:/register-schemas.sh
+
+    command: >
+      sh -c "
+        apk add --no-cache curl jq &&
+        chmod +x /register-schemas.sh &&
+        /register-schemas.sh
+      "
 networks:
   airflow-net:
     driver: bridge
-  traefik:
-    external: true
-    name: traefik_traefik_network
 
 volumes:
   data:

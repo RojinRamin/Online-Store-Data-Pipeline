@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "CheckoutStart",
+  "namespace": "behavior.events",
+  "fields": [
+    { "name": "timestamp", "type": "string" },
+    { "name": "user_id", "type": "string" },
+    { "name": "session_id", "type": "string" },
+    { "name": "event_type", "type": "string" },
+    { "name": "device", "type": "string" },
+
+    {
+      "name": "event_data",
+      "type": {
+        "type": "record",
+        "name": "CheckoutStartData",
+        "fields": [
+          {
+            "name": "shipping_method",
+            "type": ["null", "string"],
+            "default": null
+          },
+          { "name": "cart_value", "type": "double" }
+        ]
+      }
+    }
+  ]
+}

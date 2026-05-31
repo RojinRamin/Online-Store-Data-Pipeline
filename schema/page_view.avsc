@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "PageView",
+  "namespace": "behavior.events",
+  "fields": [
+    {"name":"timestamp","type":"string"},
+    {"name":"user_id","type":"string"},
+    {"name":"session_id","type":"string"},
+    {"name":"event_type","type":"string"},
+    {"name":"device","type":"string"},
+
+    {
+      "name":"event_data",
+      "type":{
+        "type":"record",
+        "name":"PageViewData",
+        "fields":[
+          {"name":"url_path","type":"string"},
+          {"name":"duration_sec","type":"int"},
+          {"name":"http_status","type":"int"}
+        ]
+      }
+    }
+  ]
+}
