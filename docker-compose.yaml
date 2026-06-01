@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
-    _PIP_ADDITIONAL_REQUIREMENTS: "-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat]"
+    _PIP_ADDITIONAL_REQUIREMENTS: "-i https://mirror-pypi.runflare.com --trusted-host mirror-pypi.runflare.com  apache-airflow-providers-mongo[common.compat confluent-kafka]"
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
     PYTHONPATH: "/opt/airflow"
   volumes:
