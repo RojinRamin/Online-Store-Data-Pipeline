@@ -3,8 +3,12 @@
 from datetime import datetime
 
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.providers.standard.operators.python import PythonOperator
+import sys
 
+sys.path.insert(0, '/opt/airflow/scripts/')
+
+from postgres_to_kafka_avro import main
 
 with DAG(
     dag_id="postgres_to_kafka_avro_batch_publish",
@@ -14,7 +18,8 @@ with DAG(
     tags=["postgres", "kafka", "avro", "schema-registry"],
 ) as dag:
 
-    publish_postgres_to_kafka_avro = BashOperator(
+    publish_postgres_to_kafka_avro = PythonOperator(
         task_id="publish_postgres_to_kafka_avro",
-        bash_command="python /opt/airflow/scripts/postgres_to_kafka_avro.py",
+        python_callable=main,
     )
+
