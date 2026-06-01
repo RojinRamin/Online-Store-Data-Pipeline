@@ -221,14 +221,14 @@ def fetch_batch(cursor, table_name, pk_column, last_processed_id):
     ]
 
 
-""" def delivery_report(err, msg):
+def delivery_report(err, msg):
     if err:
         print(f"Delivery failed: {err}")
     else:
         print(
             f"Delivered: topic={msg.topic()}, "
             f"partition={msg.partition()}, offset={msg.offset()}"
-        ) """
+        )
 
 
 def build_producer(schema_str):
