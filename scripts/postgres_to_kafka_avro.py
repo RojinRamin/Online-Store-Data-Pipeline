@@ -1,6 +1,4 @@
-# scripts/postgres_to_kafka_avro.py
-
-from datetime import date, datetime
+from datetime import datetime, date
 from decimal import Decimal
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -8,7 +6,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from confluent_kafka import SerializingProducer
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.schema_registry.json_schema import JSONSerializer
 from confluent_kafka.serialization import StringSerializer
 
 
@@ -18,64 +16,76 @@ SCHEMA_REGISTRY_URL = "http://schema-registry:8081"
 BATCH_SIZE = 1000
 
 
+USER_SCHEMA = """
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User",
+  "type": "object",
+  "properties": {
+    "user_id": {"type": "string"},
+    "name": {"type": "string"},
+    "email": {"type": "string"},
+    "signup_date": {"type": ["string", "null"]},
+    "device": {"type": ["string", "null"]},
+    "loyalty_tier": {"type": ["string", "null"]},
+    "location": {"type": ["string", "null"]}
+  },
+  "required": ["user_id", "name", "email"]
+}
+"""
+
+
+PRODUCT_SCHEMA = """
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product",
+  "type": "object",
+  "properties": {
+    "product_id": {"type": "string"},
+    "name": {"type": "string"},
+    "price": {"type": ["number", "null"]},
+    "category": {"type": ["string", "null"]},
+    "inventory": {"type": ["integer", "null"]},
+    "popularity_score": {"type": ["number", "null"]}
+  },
+  "required": ["product_id", "name"]
+}
+"""
+
+
+ORDER_SCHEMA = """
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Order",
+  "type": "object",
+  "properties": {
+    "order_id": {"type": "string"},
+    "user_id": {"type": ["string", "null"]},
+    "created_at": {"type": ["string", "null"]},
+    "total": {"type": ["number", "null"]},
+    "status": {"type": ["string", "null"]},
+    "payment_method": {"type": ["string", "null"]}
+  },
+  "required": ["order_id"]
+}
+"""
+
+
 TABLE_CONFIGS = {
     "users": {
         "pk": "user_id",
         "topic": "postgres.users",
-        "schema": """
-        {
-          "type": "record",
-          "name": "User",
-          "namespace": "digikala.postgres",
-          "fields": [
-            {"name": "user_id", "type": "string"},
-            {"name": "name", "type": "string"},
-            {"name": "email", "type": "string"},
-            {"name": "signup_date", "type": ["null", "string"], "default": null},
-            {"name": "device", "type": ["null", "string"], "default": null},
-            {"name": "loyalty_tier", "type": ["null", "string"], "default": null},
-            {"name": "location", "type": ["null", "string"], "default": null}
-          ]
-        }
-        """
+        "schema": USER_SCHEMA,
     },
     "products": {
         "pk": "product_id",
         "topic": "postgres.products",
-        "schema": """
-        {
-          "type": "record",
-          "name": "Product",
-          "namespace": "digikala.postgres",
-          "fields": [
-            {"name": "product_id", "type": "string"},
-            {"name": "name", "type": "string"},
-            {"name": "price", "type": ["null", "double"], "default": null},
-            {"name": "category", "type": ["null", "string"], "default": null},
-            {"name": "inventory", "type": ["null", "int"], "default": null},
-            {"name": "popularity_score", "type": ["null", "double"], "default": null}
-          ]
-        }
-        """
+        "schema": PRODUCT_SCHEMA,
     },
     "orders": {
         "pk": "order_id",
         "topic": "postgres.orders",
-        "schema": """
-        {
-          "type": "record",
-          "name": "Order",
-          "namespace": "digikala.postgres",
-          "fields": [
-            {"name": "order_id", "type": "string"},
-            {"name": "user_id", "type": ["null", "string"], "default": null},
-            {"name": "created_at", "type": ["null", "string"], "default": null},
-            {"name": "total", "type": ["null", "double"], "default": null},
-            {"name": "status", "type": ["null", "string"], "default": null},
-            {"name": "payment_method", "type": ["null", "string"], "default": null}
-          ]
-        }
-        """
+        "schema": ORDER_SCHEMA,
     },
 }
 
@@ -83,8 +93,10 @@ TABLE_CONFIGS = {
 def normalize_value(value):
     if isinstance(value, (datetime, date)):
         return value.isoformat()
+
     if isinstance(value, Decimal):
         return float(value)
+
     return value
 
 
@@ -95,16 +107,11 @@ def normalize_record(record):
     }
 
 
-def extract_number_from_id(value):
-    digits = "".join(ch for ch in str(value) if ch.isdigit())
+def get_number_from_id(value):
+    return int(str(value)[1:])
 
-    if not digits:
-        raise ValueError(f"ID does not contain any numeric part: {value}")
-
-    return int(digits)
-
-
-def create_topics_if_not_exist():
+""" 
+def create_topics():
     admin = AdminClient({
         "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS
     })
@@ -113,14 +120,14 @@ def create_topics_if_not_exist():
     topics_to_create = []
 
     for config in TABLE_CONFIGS.values():
-        topic_name = config["topic"]
+        topic = config["topic"]
 
-        if topic_name not in existing_topics:
+        if topic not in existing_topics:
             topics_to_create.append(
                 NewTopic(
-                    topic=topic_name,
+                    topic=topic,
                     num_partitions=1,
-                    replication_factor=1,
+                    replication_factor=1
                 )
             )
 
@@ -130,98 +137,98 @@ def create_topics_if_not_exist():
         for topic, future in futures.items():
             try:
                 future.result()
-                print(f"Created topic: {topic}")
+                print(f"Topic created: {topic}")
             except Exception as exc:
-                print(f"Topic creation skipped/failed for {topic}: {exc}")
+                print(f"Topic create skipped/failed for {topic}: {exc}") """
 
 
 def create_state_table(cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kafka_publish_state (
-            table_name TEXT PRIMARY KEY,
-            last_processed_id TEXT,
-            last_processed_number BIGINT,
+            table_name VARCHAR(50) PRIMARY KEY,
+            last_processed_id VARCHAR(50),
             updated_at TIMESTAMP DEFAULT NOW()
         );
     """)
 
 
-def get_last_processed_state(cursor, table_name):
+def get_last_processed_id(cursor, table_name):
     cursor.execute(
         """
-        SELECT last_processed_id, last_processed_number
+        SELECT last_processed_id
         FROM kafka_publish_state
         WHERE table_name = %s;
         """,
-        (table_name,),
+        (table_name,)
     )
 
-    result = cursor.fetchone()
+    row = cursor.fetchone()
 
-    if not result:
-        return None, None
+    if row:
+        return row[0]
 
-    return result[0], result[1]
+    return None
 
 
-def update_last_processed_state(cursor, table_name, last_processed_id):
-    last_processed_number = extract_number_from_id(last_processed_id)
-
+def update_last_processed_id(cursor, table_name, last_processed_id):
     cursor.execute(
         """
         INSERT INTO kafka_publish_state
-            (table_name, last_processed_id, last_processed_number, updated_at)
+            (table_name, last_processed_id, updated_at)
         VALUES
-            (%s, %s, %s, NOW())
+            (%s, %s, NOW())
         ON CONFLICT (table_name)
         DO UPDATE SET
             last_processed_id = EXCLUDED.last_processed_id,
-            last_processed_number = EXCLUDED.last_processed_number,
             updated_at = NOW();
         """,
-        (table_name, str(last_processed_id), last_processed_number),
+        (table_name, last_processed_id)
     )
 
 
-def fetch_batch(cursor, table_name, pk_column, last_processed_number):
-    numeric_id_expr = (
-        f"CAST(REGEXP_REPLACE({pk_column}, '[^0-9]', '', 'g') AS BIGINT)"
-    )
+def fetch_batch(cursor, table_name, pk_column, last_processed_id):
+    id_number_expr = f"CAST(SUBSTRING({pk_column} FROM 2) AS BIGINT)"
 
-    if last_processed_number is None:
+    if last_processed_id is None:
         query = f"""
             SELECT *
             FROM {table_name}
-            WHERE REGEXP_REPLACE({pk_column}, '[^0-9]', '', 'g') <> ''
-            ORDER BY {numeric_id_expr}
+            ORDER BY {id_number_expr}
             LIMIT %s;
         """
+
         cursor.execute(query, (BATCH_SIZE,))
+
     else:
+        last_number = get_number_from_id(last_processed_id)
+
         query = f"""
             SELECT *
             FROM {table_name}
-            WHERE REGEXP_REPLACE({pk_column}, '[^0-9]', '', 'g') <> ''
-              AND {numeric_id_expr} > %s
-            ORDER BY {numeric_id_expr}
+            WHERE {id_number_expr} > %s
+            ORDER BY {id_number_expr}
             LIMIT %s;
         """
-        cursor.execute(query, (last_processed_number, BATCH_SIZE))
+
+        cursor.execute(query, (last_number, BATCH_SIZE))
 
     rows = cursor.fetchall()
     columns = [desc[0] for desc in cursor.description]
 
-    return [dict(zip(columns, row)) for row in rows]
+    return [
+        dict(zip(columns, row))
+        for row in rows
+    ]
 
-# EDIT: added info for airflow
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"[INFO]Delivery failed: {err}")
+
+""" def delivery_report(err, msg):
+    if err:
+        print(f"Delivery failed: {err}")
     else:
         print(
-            f"[INFO]Delivered to topic={msg.topic()}, "
+            f"Delivered: topic={msg.topic()}, "
             f"partition={msg.partition()}, offset={msg.offset()}"
-        )
+        ) """
 
 
 def build_producer(schema_str):
@@ -229,89 +236,85 @@ def build_producer(schema_str):
         "url": SCHEMA_REGISTRY_URL
     })
 
-    avro_serializer = AvroSerializer(
-        schema_registry_client=schema_registry_client,
+    json_serializer = JSONSerializer(
         schema_str=schema_str,
+        schema_registry_client=schema_registry_client,
+        to_dict=lambda obj, ctx: obj
     )
 
-    return SerializingProducer({
+    producer = SerializingProducer({
         "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
         "key.serializer": StringSerializer("utf_8"),
-        "value.serializer": avro_serializer,
+        "value.serializer": json_serializer,
         "acks": "all",
-        "retries": 5,
+        "retries": 5
     })
 
+    return producer
 
-def publish_table_to_kafka(cursor, conn, table_name, config):
+
+def publish_table(cursor, conn, table_name, config):
     pk_column = config["pk"]
     topic = config["topic"]
 
     producer = build_producer(config["schema"])
-    total_sent = 0
 
-    print(f"Start publishing {table_name} to {topic}")
+    print(f"Start publishing table: {table_name}")
 
     while True:
-        last_processed_id, last_processed_number = get_last_processed_state(
-            cursor,
-            table_name,
-        )
-
-        print(
-            f"{table_name}: last_processed_id={last_processed_id}, "
-            f"last_processed_number={last_processed_number}"
-        )
+        last_id = get_last_processed_id(cursor, table_name)
 
         batch = fetch_batch(
             cursor=cursor,
             table_name=table_name,
             pk_column=pk_column,
-            last_processed_number=last_processed_number,
+            last_processed_id=last_id
         )
 
         if not batch:
+            print(f"No new records for {table_name}")
             break
 
         for record in batch:
-            normalized_record = normalize_record(record)
+            record = normalize_record(record)
 
             producer.produce(
                 topic=topic,
-                key=str(normalized_record[pk_column]),
-                value=normalized_record,
-                on_delivery=delivery_report,
+                key=str(record[pk_column]),
+                value=record,
+                on_delivery=delivery_report
             )
 
             producer.poll(0)
 
         producer.flush()
 
-        last_processed_id = batch[-1][pk_column]
+        last_record_id = batch[-1][pk_column]
 
-        update_last_processed_state(
+        update_last_processed_id(
             cursor=cursor,
             table_name=table_name,
-            last_processed_id=last_processed_id,
+            last_processed_id=last_record_id
         )
 
         conn.commit()
 
-        total_sent += len(batch)
-
         print(
             f"{table_name}: sent {len(batch)} records. "
-            f"Last ID: {last_processed_id}. Total sent: {total_sent}"
+            f"Last ID: {last_record_id}"
         )
 
     producer.flush()
-    print(f"Finished {table_name}. Total sent: {total_sent}")
+    print(f"Finished publishing table: {table_name}")
 
 
 def main():
-    create_topics_if_not_exist()
+    #create_topics()
 
-    postgres_hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
+    postgres_hook = PostgresHook(
+        postgres_conn_id=POSTGRES_CONN_ID
+    )
+
     conn = postgres_hook.get_conn()
     cursor = conn.cursor()
 
@@ -320,17 +323,13 @@ def main():
         conn.commit()
 
         for table_name, config in TABLE_CONFIGS.items():
-            publish_table_to_kafka(
+            publish_table(
                 cursor=cursor,
                 conn=conn,
                 table_name=table_name,
-                config=config,
+                config=config
             )
 
     finally:
         cursor.close()
         conn.close()
-
-
-if __name__ == "__main__":
-    main()
