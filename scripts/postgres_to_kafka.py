@@ -1,10 +1,10 @@
 from datetime import datetime, date
 from decimal import Decimal
 
+from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 from confluent_kafka import SerializingProducer
-from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.json_schema import JSONSerializer
 from confluent_kafka.serialization import StringSerializer
@@ -110,79 +110,22 @@ def normalize_record(record):
 def get_number_from_id(value):
     return int(str(value)[1:])
 
-""" 
-def create_topics():
-    admin = AdminClient({
-        "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS
-    })
 
-    existing_topics = admin.list_topics(timeout=10).topics
-    topics_to_create = []
-
-    for config in TABLE_CONFIGS.values():
-        topic = config["topic"]
-
-        if topic not in existing_topics:
-            topics_to_create.append(
-                NewTopic(
-                    topic=topic,
-                    num_partitions=1,
-                    replication_factor=1
-                )
-            )
-
-    if topics_to_create:
-        futures = admin.create_topics(topics_to_create)
-
-        for topic, future in futures.items():
-            try:
-                future.result()
-                print(f"Topic created: {topic}")
-            except Exception as exc:
-                print(f"Topic create skipped/failed for {topic}: {exc}") """
+def get_variable_name(table_name):
+    return f"postgres_to_kafka_{table_name}_last_id"
 
 
-def create_state_table(cursor):
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS kafka_publish_state (
-            table_name VARCHAR(50) PRIMARY KEY,
-            last_processed_id VARCHAR(50),
-            updated_at TIMESTAMP DEFAULT NOW()
-        );
-    """)
-
-
-def get_last_processed_id(cursor, table_name):
-    cursor.execute(
-        """
-        SELECT last_processed_id
-        FROM kafka_publish_state
-        WHERE table_name = %s;
-        """,
-        (table_name,)
+def get_last_processed_id(table_name):
+    return Variable.get(
+        get_variable_name(table_name),
+        default_var=None
     )
 
-    row = cursor.fetchone()
 
-    if row:
-        return row[0]
-
-    return None
-
-
-def update_last_processed_id(cursor, table_name, last_processed_id):
-    cursor.execute(
-        """
-        INSERT INTO kafka_publish_state
-            (table_name, last_processed_id, updated_at)
-        VALUES
-            (%s, %s, NOW())
-        ON CONFLICT (table_name)
-        DO UPDATE SET
-            last_processed_id = EXCLUDED.last_processed_id,
-            updated_at = NOW();
-        """,
-        (table_name, last_processed_id)
+def update_last_processed_id(table_name, last_processed_id):
+    Variable.set(
+        get_variable_name(table_name),
+        str(last_processed_id)
     )
 
 
@@ -196,7 +139,6 @@ def fetch_batch(cursor, table_name, pk_column, last_processed_id):
             ORDER BY {id_number_expr}
             LIMIT %s;
         """
-
         cursor.execute(query, (BATCH_SIZE,))
 
     else:
@@ -209,7 +151,6 @@ def fetch_batch(cursor, table_name, pk_column, last_processed_id):
             ORDER BY {id_number_expr}
             LIMIT %s;
         """
-
         cursor.execute(query, (last_number, BATCH_SIZE))
 
     rows = cursor.fetchall()
@@ -253,7 +194,7 @@ def build_producer(schema_str):
     return producer
 
 
-def publish_table(cursor, conn, table_name, config):
+def publish_table(cursor, table_name, config):
     pk_column = config["pk"]
     topic = config["topic"]
 
@@ -262,7 +203,7 @@ def publish_table(cursor, conn, table_name, config):
     print(f"Start publishing table: {table_name}")
 
     while True:
-        last_id = get_last_processed_id(cursor, table_name)
+        last_id = get_last_processed_id(table_name)
 
         batch = fetch_batch(
             cursor=cursor,
@@ -276,12 +217,12 @@ def publish_table(cursor, conn, table_name, config):
             break
 
         for record in batch:
-            record = normalize_record(record)
+            normalized_record = normalize_record(record)
 
             producer.produce(
                 topic=topic,
-                key=str(record[pk_column]),
-                value=record,
+                key=str(normalized_record[pk_column]),
+                value=normalized_record,
                 on_delivery=delivery_report
             )
 
@@ -292,12 +233,9 @@ def publish_table(cursor, conn, table_name, config):
         last_record_id = batch[-1][pk_column]
 
         update_last_processed_id(
-            cursor=cursor,
             table_name=table_name,
             last_processed_id=last_record_id
         )
-
-        conn.commit()
 
         print(
             f"{table_name}: sent {len(batch)} records. "
@@ -309,8 +247,6 @@ def publish_table(cursor, conn, table_name, config):
 
 
 def main():
-    #create_topics()
-
     postgres_hook = PostgresHook(
         postgres_conn_id=POSTGRES_CONN_ID
     )
@@ -319,13 +255,9 @@ def main():
     cursor = conn.cursor()
 
     try:
-        create_state_table(cursor)
-        conn.commit()
-
         for table_name, config in TABLE_CONFIGS.items():
             publish_table(
                 cursor=cursor,
-                conn=conn,
                 table_name=table_name,
                 config=config
             )
@@ -333,3 +265,7 @@ def main():
     finally:
         cursor.close()
         conn.close()
+
+
+if __name__ == "__main__":
+    main()
