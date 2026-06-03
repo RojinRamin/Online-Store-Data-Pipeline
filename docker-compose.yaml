@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
-    _PIP_ADDITIONAL_REQUIREMENTS: "apache-airflow-providers-mongo[common.compat] confluent-kafka fastavro"
+    _PIP_ADDITIONAL_REQUIREMENTS: "-i https://package-mirror.liara.ir/repository/pypi/simple --trusted-host package-mirror.liara.ir apache-airflow-providers-mongo[common.compat]  confluent-kafka fastavro   apache-airflow-providers-postgres  confluent-kafka[json] clickhouse-connect"
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
     PYTHONPATH: "/opt/airflow"
   volumes:
@@ -30,7 +30,7 @@ x-airflow-common: &airflow-common
     - /home/deuser/bootcamp-data/behavioral:/opt/airflow/behavioral-data
     - /home/deuser/projects/online_store_data_pipeline/scripts/mongo:/opt/airflow/mongo
     - /home/deuser/projects/online_store_data_pipeline/scripts:/opt/airflow/scripts
-
+    - /home/deuser/projects/online_store_data_pipeline/sql:/opt/airflow/sql
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     redis:
@@ -458,6 +458,7 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
       AUTH_TYPE: "LOGIN_FORM"
       SPRING_SECURITY_USER_NAME: "team5" 
       SPRING_SECURITY_USER_PASSWORD: "team5@quera"
@@ -488,7 +489,7 @@ services:
     environment:
       CLICKHOUSE_DB: digikala_analytics
       CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: your_password_here
+      CLICKHOUSE_PASSWORD: digikala123
     ulimits:
       nofile:
         soft: 262144
