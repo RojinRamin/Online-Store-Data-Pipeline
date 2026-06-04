@@ -8,18 +8,18 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/scripts/')
 
-from postgres_to_kafka_avro import main
+from postgres_to_kafka import main
 
 with DAG(
-    dag_id="postgres_to_kafka_avro_batch_publish",
+    dag_id="postgres_to_kafka_batch_publish",
     start_date=datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["postgres", "kafka", "avro", "schema-registry"],
+    tags=["postgres", "kafka", "schema-registry"],
 ) as dag:
 
     publish_postgres_to_kafka_avro = PythonOperator(
-        task_id="publish_postgres_to_kafka_avro",
+        task_id="publish_postgres_to_kafka",
         python_callable=main,
     )
 
