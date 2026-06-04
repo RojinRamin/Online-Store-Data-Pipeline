@@ -1,9 +1,9 @@
-# /opt/airflow/tasks/kafka_producer.py
-
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from utils.kafka_config import publish_message, flush_kafka_messages
+import logging
 
-# Make sure all strings are explicitly typed out with no "..." at the end
+logger = logging.getLogger(__name__)
+
 EVENT_COLLECTIONS = [
     "page_view",
     "product_search",
@@ -14,7 +14,7 @@ EVENT_COLLECTIONS = [
     "checkout_start",
     "payment_attempt",
     "order_complete",
-    "review_submit"
+    "review_submit",
 ]
 
 def publish_mongo_events_to_kafka():
@@ -26,6 +26,7 @@ def publish_mongo_events_to_kafka():
     for collection_name in EVENT_COLLECTIONS:
         collection = db[collection_name]
         unsent_docs = collection.find({"kafka_sent": {"$ne": True}})
+        batch_count = 0
 
         for doc in unsent_docs:
             mongo_id = doc["_id"]
@@ -33,10 +34,18 @@ def publish_mongo_events_to_kafka():
 
             publish_message(topic=collection_name, message=doc)
 
-            collection.update_one({"_id": mongo_id}, {"$set": {"kafka_sent": True}})
+            collection.update_one(
+                {"_id": mongo_id},
+                {"$set": {"kafka_sent": True}}
+            )
+
+            batch_count += 1
             total_sent += 1
 
-    # Flush once at the end of all collections
-    flush_kafka_messages()
+        if batch_count > 0:
+            logger.info(f"Collection '{collection_name}': {batch_count} messages published")
 
-    print(f"Total messages published: {total_sent}")
+    flush_kafka_messages()
+    logger.info(f"Done! Total messages published: {total_sent}")
+    client.close()
+    return total_sent
