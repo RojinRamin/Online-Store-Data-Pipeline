@@ -1,9 +1,4 @@
--- =============================================================================
--- ClickHouse: Kafka → Storage → Materialized Views for all event types
--- Uses AvroConfluent format with flattened event_data fields.
--- ClickHouse maps Avro nested record fields using dot notation:
---   event_data.product_id → column named `event_data.product_id`
--- =============================================================================
+
 
 CREATE DATABASE IF NOT EXISTS digikala;
 
