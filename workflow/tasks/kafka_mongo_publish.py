@@ -15,16 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
-
 MONGO_CONN_ID           = "mongo_test"
 MONGO_DB_NAME           = "mongodb"
 KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
 SCHEMA_REGISTRY_URL     = "http://schema-registry:8081"
 BATCH_SIZE              = 1000
 
-
 # ── Schemas ───────────────────────────────────────────────────────────────────
-
 PAGE_VIEW_SCHEMA = """
 {
   "type": "record",
@@ -305,7 +302,6 @@ WISHLIST_ADD_SCHEMA = """
 }
 """
 
-
 # ── Event configs ─────────────────────────────────────────────────────────────
 #
 # Mirrors TABLE_CONFIGS in postgres_to_kafka.py.
@@ -366,9 +362,7 @@ EVENT_CONFIGS = {
     },
 }
 
-
 # ── Normalization ─────────────────────────────────────────────────────────────
-
 def normalize_value(value):
     if isinstance(value, ObjectId):
         return str(value)
@@ -391,12 +385,10 @@ def normalize_record(record: dict) -> dict:
         for key, value in record.items()
     }
 
-
 # ── Airflow Variable state ────────────────────────────────────────────────────
 #
 # Mirrors get_last_processed_id / update_last_processed_id from
 # postgres_to_kafka.py, using Airflow Variables keyed by event_type.
-
 def get_variable_name(event_type: str) -> str:
     return f"mongo_to_kafka_{event_type}_last_id"
 
@@ -419,9 +411,7 @@ def update_last_processed_id(event_type: str, last_processed_id: ObjectId):
         str(last_processed_id)
     )
 
-
 # ── Fetch ─────────────────────────────────────────────────────────────────────
-
 def fetch_batch(collection, last_processed_id) -> list:
     query = {}
 
@@ -437,7 +427,6 @@ def fetch_batch(collection, last_processed_id) -> list:
 
 
 # ── Producer ──────────────────────────────────────────────────────────────────
-
 def delivery_report(err, msg):
     if err:
         logger.error(
@@ -476,7 +465,6 @@ def build_producer(schema_str: str) -> SerializingProducer:
 #   - one producer per event_type (own schema)
 #   - cursor-based pagination via Airflow Variable
 #   - fetch → produce → flush → update state → repeat until empty
-
 def publish_event_type(db, event_type: str, config: dict):
     collection = db[config["collection"]]
     topic      = config["topic"]
@@ -527,7 +515,6 @@ def publish_event_type(db, event_type: str, config: dict):
 
 
 # ── Airflow entrypoint ────────────────────────────────────────────────────────
-
 def main():
     hook   = MongoHook(mongo_conn_id=MONGO_CONN_ID)
     client = hook.get_conn()
@@ -543,7 +530,3 @@ def main():
 
     finally:
         client.close()
-
-
-if __name__ == "__main__":
-    main()

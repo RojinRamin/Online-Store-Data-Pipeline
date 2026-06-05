@@ -4,8 +4,8 @@ import pandas as pd
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from psycopg2.extras import execute_values
 
-from utils.postgres_constants import BASE_PATH, EXPECTED_COLUMNS, PRIMARY_KEYS
-from tasks.postgres_transformers import clean_dataframe
+from workflow.utils.postgres_constanst import BASE_PATH, EXPECTED_COLUMNS, PRIMARY_KEYS
+from workflow.tasks.porstgres_transform import clean_dataframe
 
 
 def load_to_postgres(table_name, file_name):
@@ -18,7 +18,6 @@ def load_to_postgres(table_name, file_name):
         on_bad_lines="warn"
     )
 
-
     df = clean_dataframe(df, table_name)
 
     expected_cols = EXPECTED_COLUMNS.get(table_name, [])
@@ -30,7 +29,6 @@ def load_to_postgres(table_name, file_name):
     if df.empty:
         print(f"[{table_name}] No valid data to load.")
         return
-
 
     pk = PRIMARY_KEYS.get(table_name)
 
@@ -64,4 +62,3 @@ def load_to_postgres(table_name, file_name):
     conn.commit()
     cursor.close()
     conn.close()
-

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from airflow.providers.mongo.hooks.mongo import MongoHook
 import os
 import json
@@ -8,52 +8,73 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/mongo')
 
-from cast_utils import (
+from workflow.utils.casts import (
     TransformError,
     is_null,
     cast_str,
     cast_int,
     cast_float,
     cast_bool,
-    cast_datetime 
+    cast_datetime
 )
 
 # ============================================
-FOLDER_PATH = "/opt/airflow/behavioral-data/"  
-FILE_PATTERN = "*.json"  
-# ============================================
+FOLDER_PATH = "/opt/airflow/behavioral-data/"
+FILE_PATTERN = "*.json"
 
+COMMON_REQUIRED_FIELDS = [
+    "timestamp",
+    "user_id",
+    "event_type",
+    "device",
+    "session_id",
+]
+VALID_EVENT_TYPES = {
+    "page_view",
+    "product_search",
+    "cart_view",
+    "add_to_cart",
+    "remove_from_cart",
+    "wishlist_add",
+    "checkout_start",
+    "payment_attempt",
+    "order_complete",
+    "review_submit"
+}
+
+# ============================================
 def get_file_list_from_server(**kwargs):
     all_files = glob.glob(os.path.join(FOLDER_PATH, FILE_PATTERN))
     file_names = [os.path.basename(f) for f in all_files]
     kwargs['ti'].xcom_push(key='all_files', value=file_names)
     return file_names
 
+
 def get_state_from_mongo(**kwargs):
     hook = MongoHook(mongo_conn_id='mongo_test')
     client = hook.get_conn()
-    db = client['mongodb']  
+    db = client['mongodb']
     collection = db['state']
-    
+
     processed_docs = collection.find({}, {"file_name": 1, "_id": 0})
     state = [doc['file_name'] for doc in processed_docs]
-    
+
     kwargs['ti'].xcom_push(key='state', value=state)
     return state
+
 
 def find_new_files(**kwargs):
     all_files = kwargs['ti'].xcom_pull(key='all_files', task_ids='get_file_list')
     state = kwargs['ti'].xcom_pull(key='state', task_ids='get_state')
-    
+
     new_files = [f for f in all_files if f not in state]
-    
+
     kwargs['ti'].xcom_push(key='new_files', value=new_files)
 
     return new_files
 
 
 def process_single_file(file_name, **kwargs):
-
     hook = MongoHook(mongo_conn_id='mongo_test')
 
     client = hook.get_conn()
@@ -74,7 +95,6 @@ def process_single_file(file_name, **kwargs):
         records = []
 
     if not records:
-
         print(f"[INFO] No valid records found in {file_name}")
 
         return 0
@@ -94,28 +114,25 @@ def process_single_file(file_name, **kwargs):
         'records_inserted': inserted_count
     })
 
-   # print(
-   #     f"[INFO] File processed successfully | "
-   #     f"file={file_name} | "
-   #     f"inserted_records={inserted_count}"
-   # )
+    # print(
+    #     f"[INFO] File processed successfully | "
+    #     f"file={file_name} | "
+    #     f"inserted_records={inserted_count}"
+    # )
 
     return inserted_count
 
 
-
-
 def process_all_new_files(**kwargs):
-
     new_files = kwargs['ti'].xcom_pull(key='new_files', task_ids='find_new_files')
-    
+
     if not new_files:
         print("There is no new file")
         return 0
-    
+
     total_records = 0
     failed_files = []
-    
+
     for file_name in new_files:
         try:
             records_count = process_single_file(file_name, **kwargs)
@@ -123,41 +140,14 @@ def process_all_new_files(**kwargs):
         except Exception as e:
             failed_files.append(file_name)
 
-
     print("\n[INFO] Processing summary:")
     print(f"   - Successful files: {len(new_files) - len(failed_files)}")
     print(f"   - Total records inserted: {total_records}")
-    
+
     if failed_files:
         print(f"   - Failed files: {failed_files}")
-    
+
     return total_records
-
-
-# scripts/behavioral_transform.py
-
-
-COMMON_REQUIRED_FIELDS = [
-    "timestamp",
-    "user_id",
-    "event_type",
-    "device",
-    "session_id",
-]
-
-
-VALID_EVENT_TYPES = {
-    "page_view",
-    "product_search",
-    "cart_view",
-    "add_to_cart",
-    "remove_from_cart",
-    "wishlist_add",
-    "checkout_start",
-    "payment_attempt",
-    "order_complete",
-    "review_submit"
-}
 
 
 def validate_common_fields(raw_event):
@@ -183,7 +173,8 @@ def transform_product_search(raw_event):
     return {
         "query": cast_str(raw_event.get("query"), "query", required=True),
         "results_count": cast_int(raw_event.get("results_count"), "results_count", required=False, default=0),
-        "clicked_position": cast_int(raw_event.get("clicked_position"), "clicked_position", required=False, default=None),
+        "clicked_position": cast_int(raw_event.get("clicked_position"), "clicked_position", required=False,
+                                     default=None),
     }
 
 
@@ -215,7 +206,8 @@ def transform_add_to_cart(raw_event):
     return {
         "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
         "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True, default=1),
-        "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False, default=None),
+        "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False,
+                                     default=None),
     }
 
 
@@ -223,7 +215,8 @@ def transform_remove_from_cart(raw_event):
     return {
         "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
         "quantity": cast_int(raw_event.get("quantity"), "quantity", required=True, default=1),
-        "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False, default=None),
+        "cart_total_items": cast_int(raw_event.get("cart_total_items"), "cart_total_items", required=False,
+                                     default=None),
     }
 
 
@@ -250,17 +243,18 @@ def transform_payment_attempt(raw_event):
 
 
 def transform_order_complete(raw_event):
-    
     return {
         "order_id": cast_str(raw_event.get("order_id"), "order_id", required=True),
-        "fulfillment_speed": cast_str(raw_event.get("fulfillment_speed"), "fulfillment_speed", required=False, default=None),
+        "fulfillment_speed": cast_str(raw_event.get("fulfillment_speed"), "fulfillment_speed", required=False,
+                                      default=None),
     }
+
 
 def transform_review_submit(raw_event):
     return {
         "product_id": cast_str(raw_event.get("product_id"), "product_id", required=True),
-        "rating": cast_int(raw_event.get("rating"), "rating", required=True), 
-        "text_length": cast_int(raw_event.get("text_length"), "text_length", required=False, default=0)  
+        "rating": cast_int(raw_event.get("rating"), "rating", required=True),
+        "text_length": cast_int(raw_event.get("text_length"), "text_length", required=False, default=0)
     }
 
 
@@ -298,6 +292,7 @@ def transform_event(raw_event, source_file):
         },
     }
 
+
 def transform_jsonl_file(file_path):
     """
     Reads a JSONL file line by line and transforms valid events.
@@ -314,16 +309,16 @@ def transform_jsonl_file(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             if not line.strip():
-                    continue
+                continue
 
             try:
                 raw_event = json.loads(line)
                 transformed_event = transform_event(raw_event, file_path)
                 transformed_events.append(transformed_event)
 
-               # if len(transformed_events) == 1:
-               #     print(f"\n[DEBUG] Sample transformed event (line {line_number}):")
-               #     print(json.dumps(transformed_event, indent=2, default=str))
+            # if len(transformed_events) == 1:
+            #     print(f"\n[DEBUG] Sample transformed event (line {line_number}):")
+            #     print(json.dumps(transformed_event, indent=2, default=str))
 
             except Exception as error:
 
@@ -338,7 +333,6 @@ def transform_jsonl_file(file_path):
 
 
 def load_records_to_mongodb(records, db):
-
     inserted_count = 0
 
     for record in records:

@@ -1,5 +1,4 @@
 -- sales performance, daily report
-
 CREATE TABLE IF NOT EXISTS digikala.sales_performance_daily_report
 (
     report_date Date,

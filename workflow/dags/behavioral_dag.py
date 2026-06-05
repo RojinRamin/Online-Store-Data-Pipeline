@@ -7,13 +7,12 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/mongo')
 
-from behavioral_pipeline import (
+from workflow.tasks.mongo_pipeline import (
     get_file_list_from_server,
     get_state_from_mongo,
     find_new_files,
     process_all_new_files
 )
-
 
 DEFAULT_ARGS = {
     "owner": "airflow",
@@ -22,7 +21,6 @@ DEFAULT_ARGS = {
     "retries": 1,
     "retry_delay": timedelta(minutes=5),
 }
-
 
 with DAG(
     dag_id="process_new_files_to_mongodb",

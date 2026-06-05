@@ -1,25 +1,19 @@
 from airflow import DAG
 
-from airflow.providers.common.sql.operators.sql import (
-    SQLExecuteQueryOperator
-)
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 
 from datetime import datetime
 
-
 with DAG(
-    dag_id="postgres_schema_setup",
-    start_date=datetime(2026, 1, 1),
-    schedule="@once",
-    catchup=False,
-    tags=["schema", "ddl"]
+        dag_id="postgres_schema_setup",
+        start_date=datetime(2026, 1, 1),
+        schedule="@once",
+        catchup=False,
+        tags=["schema", "ddl"]
 ) as dag:
-
     create_tables = SQLExecuteQueryOperator(
         task_id="create_postgres_tables",
-
         conn_id="postgres_business",
-
         sql="""
         DROP TABLE IF EXISTS orders;
         DROP TABLE IF EXISTS users;
@@ -28,7 +22,7 @@ with DAG(
         DROP TYPE IF EXISTS orders_status CASCADE;
         DROP TYPE IF EXISTS orders_payment_method CASCADE;
         DROP TYPE IF EXISTS products_category CASCADE;
-        
+
         CREATE TYPE loyalty_tier_enum AS ENUM (
             'Bronze',
             'Silver',
@@ -84,6 +78,5 @@ with DAG(
             FOREIGN KEY (user_id)
             REFERENCES users(user_id)
         );
-
         """
     )

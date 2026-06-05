@@ -6,7 +6,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.models import Variable
 
-from utils.postgres_constants import BASE_PATH
+from workflow.utils.postgres_constanst import BASE_PATH
 from tasks.postgres_load import load_to_postgres
 
 
@@ -27,7 +27,6 @@ def update_mtime(file_name, variable_key):
 
     current_mtim = os.path.getmtime(file_path)
     Variable.set(variable_key, str(current_mtim))
-
 
 
 def load_users_if_needed():
@@ -90,6 +89,5 @@ with DAG(
     )
 
     end = EmptyOperator(task_id="end")
-
 
     start >> load_users >> load_orders >> load_products >> end
