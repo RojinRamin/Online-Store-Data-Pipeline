@@ -1,6 +1,6 @@
 import pandas as pd
 
-from workflow.utils.postgres_constanst import PRIMARY_KEYS
+from utils.postgres_constanst import PRIMARY_KEYS
 
 LOYALTY_MAPPING = {
     "bronze": "Bronze",

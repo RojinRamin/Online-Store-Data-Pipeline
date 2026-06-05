@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/mongo')
 
-from workflow.utils.casts import (
+from utils.casts import (
     TransformError,
     is_null,
     cast_str,

@@ -4,8 +4,8 @@ import pandas as pd
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from psycopg2.extras import execute_values
 
-from workflow.utils.postgres_constanst import BASE_PATH, EXPECTED_COLUMNS, PRIMARY_KEYS
-from workflow.tasks.porstgres_transform import clean_dataframe
+from utils.postgres_constanst import BASE_PATH, EXPECTED_COLUMNS, PRIMARY_KEYS
+from tasks.porstgres_transform import clean_dataframe
 
 
 def load_to_postgres(table_name, file_name):

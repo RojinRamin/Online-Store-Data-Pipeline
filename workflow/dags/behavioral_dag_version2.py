@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import glob
 import sys
 
-from workflow.tasks.mongo_pipeline import process_all_new_files
+from tasks.mongo_pipeline import process_all_new_files
 
 from airflow import DAG
 from airflow.providers.standard.sensors.filesystem import FileSensor
