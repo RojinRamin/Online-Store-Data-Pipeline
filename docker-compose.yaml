@@ -12,8 +12,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
-    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET:-airflow_jwt_secret}
-    AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW_ISSUE}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     AIRFLOW__CORE__TEST_CONNECTION: Enabled
     _PIP_ADDITIONAL_REQUIREMENTS: "-i https://package-mirror.liara.ir/repository/pypi/simple --trusted-host package-mirror.liara.ir apache-airflow-providers-mongo[common.compat]  confluent-kafka fastavro   apache-airflow-providers-postgres  confluent-kafka[json] clickhouse-connect"
@@ -51,9 +51,9 @@ services:
     networks:
       - airflow-net
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AF_POSTGES_USER}
+      POSTGRES_PASSWORD: ${AF_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AF_POSTGRES_DB}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -335,9 +335,9 @@ services:
       - airflow-net
     environment:
       TZ: Asia/Tehran
-      POSTGRES_USER: digikala
-      POSTGRES_PASSWORD: digikala123
-      POSTGRES_DB: digikala_store
+      POSTGRES_USER: ${POSTGRES_BS_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_BS_USER}
+      POSTGRES_DB: ${POSTGRES_BS_DB}
     ports:
       - 5433:5432
     volumes:
@@ -365,8 +365,8 @@ services:
     networks:
       - airflow-net
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=digikala
-      - MONGO_INITDB_ROOT_PASSWORD=digikala123
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     volumes:
       - ./data/mongodb:/data/db
     ports:
@@ -414,7 +414,7 @@ services:
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LISTENERS: ${SCHEMAREG_LISTENERS}
     ports:
       - "8081:8081"
   kafka-connect:
@@ -488,9 +488,9 @@ services:
       - ./data/clickhouse:/var/lib/clickhouse
       - ./config/users.xml:/etc/clickhouse-server/users.d/users.xml
     environment:
-      CLICKHOUSE_DB: digikala_analytics
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: digikala123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     ulimits:
       nofile:
         soft: 262144
@@ -509,9 +509,9 @@ services:
       MB_DB_TYPE: postgres
       MB_DB_DBNAME: metabase
       MB_DB_PORT: 5432
-      MB_DB_USER: metabase
-      MB_DB_PASS: metabase123
-      MB_DB_HOST: metabase-postgres
+      MB_DB_USER: ${MB_DB_USER}
+      MB_DB_PASS: ${MB_DB_PASS}
+      MB_DB_HOST: ${MB_DB_HOST}
     labels:
       traefik.enable: "true"
       traefik.docker.network: "traefik_traefik_network"
@@ -528,9 +528,9 @@ services:
     networks:
       - airflow-net
     environment:
-      POSTGRES_USER: metabase
-      POSTGRES_PASSWORD: metabase123
-      POSTGRES_DB: metabase
+      POSTGRES_USER: ${MB_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${MB_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${MB_POSTGRES_DB}
     volumes:
       - metabase-db-volume:/var/lib/postgresql/data
     restart: always
