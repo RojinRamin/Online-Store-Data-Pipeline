@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/scripts/')
 
-from workflow.tasks.kafka_mongo_publish import main
+from tasks.kafka_mongo_publish import main
 
 with DAG(
         dag_id="mongo_to_kafka_batch_publish",

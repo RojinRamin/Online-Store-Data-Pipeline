@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/scripts/')
 
-from workflow.tasks.kafka_postgres_publish import main
+from tasks.kafka_postgres_publish import main
 
 with DAG(
     dag_id="postgres_to_kafka_batch_publish",

@@ -6,7 +6,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.models import Variable
 
-from workflow.utils.postgres_constanst import BASE_PATH
+from utils.postgres_constanst import BASE_PATH
 from tasks.postgres_load import load_to_postgres
 
 

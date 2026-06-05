@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, '/opt/airflow/mongo')
 
-from workflow.tasks.mongo_pipeline import (
+from tasks.mongo_pipeline import (
     get_file_list_from_server,
     get_state_from_mongo,
     find_new_files,
