@@ -1,9 +1,0 @@
-touch workflow/dags/.gitkeep
-touch workflow/logs/.gitkeep
-touch workflow/config/.gitkeep
-touch workflow/plugins/.gitkeep
-
-touch data/postgres/.gitkeep
-touch data/mongo/.gitkeep
-touch data/clickhouse/.gitkeep
-touch data/kafka/.gitkeep
