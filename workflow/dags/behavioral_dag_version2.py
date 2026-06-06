@@ -22,7 +22,7 @@ DEFAULT_ARGS = {
 def find_daily_json_files(**kwargs):
     ds_nodash = kwargs["ds_nodash"]
 
-    pattern = f"/opt/airflow/bootcamp_data/behavioral/session_{ds_nodash}_*.json"
+    pattern = "/opt/airflow/data/behavioral/session_{{ ds_nodash }}_*.json"
 
     files = glob.glob(pattern)
 
@@ -40,7 +40,7 @@ with DAG(
 
     wait_json_files = FileSensor(
         task_id="wait_behavioral_json",
-        filepath="bootcamp_data/behavioral/session_{{ ds_nodash }}_*.json",
+        filepath="/opt/airflow/data/behavioral/session_{{ ds_nodash }}_*.json",
         poke_interval=30,
         timeout=600,
         fs_conn_id="fs_default",
