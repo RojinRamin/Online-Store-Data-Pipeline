@@ -11,7 +11,7 @@ from tasks.kafka_postgres_publish import main
 with DAG(
     dag_id="postgres_to_kafka_batch_publish",
     start_date=datetime(2026, 1, 1),
-    schedule=None,
+    schedule="0 6 * * *",
     catchup=False,
     tags=["postgres", "kafka", "schema-registry"],
 ) as dag:
