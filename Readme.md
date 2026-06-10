@@ -178,8 +178,8 @@ Run DAGs in this order:
 | 1 | `postgres_schema_setup` | Once | Create PostgreSQL enums and tables |
 | 2 | `csv_etl_pipeline` | Daily | Load CSV data into PostgreSQL |
 | 3 | `process_new_files_to_mongodb` or `process_daily_behavioral_json_to_mongodb` | Daily | Ingest behavioral JSONL into MongoDB |
-| 4 | `postgres_to_kafka_batch_publish` | Manual | Stream transactional data to Kafka |
-| 5 | `mongo_to_kafka_batch_publish` | Manual | Stream behavioral events to Kafka |
+| 4 | `postgres_to_kafka_batch_publish` | Daily | Stream transactional data to Kafka |
+| 5 | `mongo_to_kafka_batch_publish` | Daily | Stream behavioral events to Kafka |
 
 ### 5. Initialize ClickHouse
 
@@ -349,12 +349,12 @@ Each JSONL record must include: `timestamp`, `user_id`, `session_id`, `event_typ
 
 ### `postgres_to_kafka_batch_publish`
 
-- **Schedule:** Manual
+- **Schedule:** `@daily`
 - **Purpose:** Publishes new PostgreSQL records to Kafka with JSON Schema serialization
 
 ### `mongo_to_kafka_batch_publish`
 
-- **Schedule:** Manual
+- **Schedule:** `@daily`
 - **Purpose:** Publishes new MongoDB event documents to Kafka with Avro serialization
 
 ---
