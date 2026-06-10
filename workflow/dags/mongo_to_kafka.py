@@ -11,7 +11,7 @@ from tasks.kafka_mongo_publish import main
 with DAG(
         dag_id="mongo_to_kafka_batch_publish",
         start_date=datetime(2026, 1, 1),
-        schedule=schedule="0 19 * * *",,
+        schedule=schedule="0 6 * * *",,
         catchup=False,
         tags=["mongo", "kafka", "schema-registry"],
 ) as dag:
