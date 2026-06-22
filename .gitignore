@@ -35,3 +35,7 @@ __pycache__/
 
 # Logs
 *.log
+
+# Windows metadata files
+*Zone.Identifier
+*identifier*
